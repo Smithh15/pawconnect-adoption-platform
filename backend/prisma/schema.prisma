@@ -1,0 +1,178 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─────────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────────
+
+enum Role {
+  ADOPTANTE
+  RESCATISTA
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum RescuerStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum Species {
+  PERRO
+  GATO
+  OTRO
+}
+
+enum AnimalSize {
+  PEQUENO
+  MEDIANO
+  GRANDE
+}
+
+enum Gender {
+  MACHO
+  HEMBRA
+}
+
+enum AnimalStatus {
+  DISPONIBLE
+  EN_PROCESO
+  ADOPTADO
+  NO_DISPONIBLE
+}
+
+enum RequestStatus {
+  PENDIENTE
+  APROBADA
+  RECHAZADA
+  CANCELADA
+  FINALIZADA
+}
+
+enum ModerationTargetType {
+  USER
+  ANIMAL
+  REQUEST
+}
+
+// ─────────────────────────────────────────────
+// Models
+// ─────────────────────────────────────────────
+
+model User {
+  id        String     @id @default(uuid())
+  email     String     @unique
+  password  String
+  name      String
+  phone     String?
+  role      Role       @default(ADOPTANTE)
+  status    UserStatus @default(ACTIVE)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  rescuerProfile   RescuerProfile?   @relation("UserProfile")
+  approvedProfiles RescuerProfile[]  @relation("ApprovedBy")
+  adoptionRequests AdoptionRequest[]
+  moderationLogs   ModerationLog[]
+
+  @@map("users")
+}
+
+model RescuerProfile {
+  id               String        @id @default(uuid())
+  userId           String        @unique
+  user             User          @relation("UserProfile", fields: [userId], references: [id], onDelete: Cascade)
+  organizationName String?
+  description      String?
+  city             String
+  country          String        @default("Colombia")
+  website          String?
+  status           RescuerStatus @default(PENDING)
+  approvedAt       DateTime?
+  approvedById     String?
+  approvedBy       User?         @relation("ApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  animals Animal[]
+
+  @@map("rescuer_profiles")
+}
+
+model Animal {
+  id          String       @id @default(uuid())
+  rescuerId   String
+  rescuer     RescuerProfile @relation(fields: [rescuerId], references: [id], onDelete: Cascade)
+  name        String
+  species     Species
+  breed       String?
+  ageMonths   Int?
+  size        AnimalSize
+  gender      Gender
+  city        String
+  description String
+  healthNotes String?
+  vaccinated  Boolean      @default(false)
+  sterilized  Boolean      @default(false)
+  status      AnimalStatus @default(DISPONIBLE)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  images           AnimalImage[]
+  adoptionRequests AdoptionRequest[]
+
+  @@map("animals")
+}
+
+model AnimalImage {
+  id        String   @id @default(uuid())
+  animalId  String
+  animal    Animal   @relation(fields: [animalId], references: [id], onDelete: Cascade)
+  url       String
+  publicId  String
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@map("animal_images")
+}
+
+model AdoptionRequest {
+  id          String        @id @default(uuid())
+  animalId    String
+  animal      Animal        @relation(fields: [animalId], references: [id])
+  adopterId   String
+  adopter     User          @relation(fields: [adopterId], references: [id])
+  motivation  String
+  status      RequestStatus @default(PENDIENTE)
+  reviewNote  String?
+  reviewedAt  DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@map("adoption_requests")
+}
+
+model ModerationLog {
+  id         String               @id @default(uuid())
+  adminId    String
+  admin      User                 @relation(fields: [adminId], references: [id])
+  targetType ModerationTargetType
+  targetId   String
+  action     String
+  notes      String?
+  createdAt  DateTime             @default(now())
+
+  @@map("moderation_logs")
+}
