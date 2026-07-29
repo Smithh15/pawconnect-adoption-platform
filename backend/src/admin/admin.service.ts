@@ -16,8 +16,6 @@ import { SuspendUserDto } from './dto/suspend-user.dto';
 export class AdminService {
   constructor(private prisma: PrismaService) {}
 
-  // ── Rescuers ──────────────────────────────────────────────
-
   async getPendingRescuers() {
     return this.prisma.rescuerProfile.findMany({
       where: { status: RescuerStatus.PENDING },
@@ -112,8 +110,6 @@ export class AdminService {
     return updated;
   }
 
-  // ── Users ─────────────────────────────────────────────────
-
   async getUsers() {
     return this.prisma.user.findMany({
       select: {
@@ -195,8 +191,6 @@ export class AdminService {
 
     return updated;
   }
-
-  // ── Stats ─────────────────────────────────────────────────
 
   async getStats() {
     const [

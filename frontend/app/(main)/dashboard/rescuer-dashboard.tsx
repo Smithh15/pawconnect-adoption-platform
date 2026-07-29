@@ -27,14 +27,12 @@ export function RescuerDashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Primero cargamos el perfil del rescatista para obtener su ID
     api
       .get<RescuerProfile>('/rescuers/me')
       .then(async (profileRes) => {
         setProfile(profileRes.data);
 
         if (profileRes.data.status === 'APPROVED') {
-          // Solo cargamos animales y solicitudes si el perfil está aprobado
           const [animalsRes, reqRes] = await Promise.all([
             api.get<{ data: Animal[] }>(`/animals?rescuerId=${profileRes.data.id}&limit=50`),
             api.get<AdoptionRequest[]>('/adoption-requests/rescuer'),
@@ -99,7 +97,6 @@ export function RescuerDashboard() {
     );
   }
 
-  // Perfil pendiente de aprobación
   if (profile?.status === 'PENDING') {
     return (
       <div className="container mx-auto px-4 py-16 flex flex-col items-center gap-4 text-center">
@@ -118,7 +115,6 @@ export function RescuerDashboard() {
     );
   }
 
-  // Perfil rechazado
   if (profile?.status === 'REJECTED') {
     return (
       <div className="container mx-auto px-4 py-16 flex flex-col items-center gap-4 text-center">

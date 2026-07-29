@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { MapPin, Heart, Shield, Syringe, CheckCircle, User, ImagePlus, Trash2 } from 'lucide-react';
+import { MapPin, Heart, Shield, Syringe, CheckCircle, User, ImagePlus, Trash2, Star } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -110,6 +110,17 @@ export default function AnimalDetailPage() {
       toast.success('Foto eliminada');
     } catch {
       toast.error('Error al eliminar la foto');
+    }
+  }
+
+  async function handleSetPrimary(imageId: string) {
+    try {
+      await api.patch(`/animals/${id}/images/${imageId}/primary`);
+      const updated = await api.get<Animal>(`/animals/${id}`);
+      setAnimal(updated.data);
+      toast.success('Foto principal actualizada');
+    } catch {
+      toast.error('Error al actualizar la foto principal');
     }
   }
 
@@ -244,12 +255,24 @@ export default function AnimalDetailPage() {
                       {images.map((img) => (
                         <div key={img.id} className="group relative aspect-square overflow-hidden rounded-md bg-muted">
                           <Image src={img.url} alt="" fill className="object-cover" sizes="80px" />
-                          <button
-                            onClick={() => handleDeleteImage(img.id)}
-                            className="absolute inset-0 flex items-center justify-center bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <Trash2 className="h-4 w-4 text-white" />
-                          </button>
+                          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {!img.isPrimary && (
+                              <button
+                                onClick={() => handleSetPrimary(img.id)}
+                                className="rounded-full bg-white/20 p-1.5 hover:bg-white/40"
+                                title="Hacer principal"
+                              >
+                                <Star className="h-4 w-4 text-white" />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleDeleteImage(img.id)}
+                              className="rounded-full bg-destructive/80 p-1.5 hover:bg-destructive"
+                              title="Eliminar foto"
+                            >
+                              <Trash2 className="h-4 w-4 text-white" />
+                            </button>
+                          </div>
                           {img.isPrimary && (
                             <span className="absolute bottom-0 left-0 right-0 bg-primary/80 py-0.5 text-center text-[10px] text-white">
                               Principal

@@ -8,10 +8,6 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-// ─────────────────────────────────────────────
-// Enums
-// ─────────────────────────────────────────────
-
 enum Role {
   ADOPTANTE
   RESCATISTA
@@ -66,10 +62,6 @@ enum ModerationTargetType {
   ANIMAL
   REQUEST
 }
-
-// ─────────────────────────────────────────────
-// Models
-// ─────────────────────────────────────────────
 
 model User {
   id        String     @id @default(uuid())

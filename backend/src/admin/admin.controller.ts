@@ -28,8 +28,6 @@ export class AdminController {
     return this.adminService.getStats();
   }
 
-  // ── Rescuers ──────────────────────────────────────────────
-
   @Get('rescuers/pending')
   getPendingRescuers() {
     return this.adminService.getPendingRescuers();
@@ -53,8 +51,6 @@ export class AdminController {
   ) {
     return this.adminService.rejectRescuer(id, user.id, dto);
   }
-
-  // ── Users ─────────────────────────────────────────────────
 
   @Get('users')
   getUsers() {

@@ -165,8 +165,6 @@ export class AnimalsService {
     return { message: 'Animal eliminado exitosamente' };
   }
 
-  // ── Images ────────────────────────────────────────────────
-
   async addImage(animalId: string, userId: string, file: Express.Multer.File) {
     const animal = await this.prisma.animal.findUnique({
       where: { id: animalId },
@@ -250,7 +248,6 @@ export class AnimalsService {
     await this.uploadService.deleteImage(image.publicId);
     await this.prisma.animalImage.delete({ where: { id: imageId } });
 
-    // Si era la principal, asignar la siguiente disponible
     if (image.isPrimary) {
       const next = await this.prisma.animalImage.findFirst({
         where: { animalId },

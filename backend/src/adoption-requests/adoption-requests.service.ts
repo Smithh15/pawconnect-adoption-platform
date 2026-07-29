@@ -154,7 +154,6 @@ export class AdoptionRequestsService {
         select: REQUEST_SELECT,
       });
 
-      // Marcar animal como EN_PROCESO y rechazar otras solicitudes pendientes
       await tx.animal.update({
         where: { id: request.animalId },
         data: { status: AnimalStatus.EN_PROCESO },
@@ -247,7 +246,6 @@ export class AdoptionRequestsService {
         select: REQUEST_SELECT,
       });
 
-      // Si estaba aprobada, devolver el animal a DISPONIBLE
       if (request.status === RequestStatus.APROBADA) {
         await tx.animal.update({
           where: { id: request.animalId },

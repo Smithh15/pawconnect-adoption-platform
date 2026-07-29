@@ -30,8 +30,6 @@ import { FilterAnimalsDto } from './dto/filter-animals.dto';
 export class AnimalsController {
   constructor(private readonly animalsService: AnimalsService) {}
 
-  // ── Rutas PÚBLICAS (lectura) — token opcional ──────────────
-
   @Get()
   @UseGuards(OptionalJwtAuthGuard)
   findAll(@Query() filters: FilterAnimalsDto) {
@@ -43,8 +41,6 @@ export class AnimalsController {
   findOne(@Param('id') id: string) {
     return this.animalsService.findOne(id);
   }
-
-  // ── Rutas PROTEGIDAS — requieren token JWT válido ──────────
 
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -75,8 +71,6 @@ export class AnimalsController {
   ) {
     return this.animalsService.remove(id, user.id, user.role);
   }
-
-  // ── Imágenes — solo RESCATISTA ─────────────────────────────
 
   @Post(':id/images')
   @UseGuards(JwtAuthGuard, RolesGuard)

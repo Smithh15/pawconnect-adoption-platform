@@ -21,7 +21,7 @@ export class UploadService {
         {
           folder,
           resource_type: 'image',
-          transformation: [{ width: 1200, height: 900, crop: 'limit', quality: 'auto' }],
+          transformation: [{ width: 1080, height: 1080, crop: 'limit', quality: 'auto' }],
         },
         (error, result: UploadApiResponse | undefined) => {
           if (error || !result) {
