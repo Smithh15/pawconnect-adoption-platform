@@ -26,19 +26,19 @@ import type { Animal } from '@/lib/types';
 
 const schema = z.object({
   name: z.string().min(1, 'El nombre es requerido'),
-  species: z.enum(['PERRO', 'GATO', 'OTRO'], { required_error: 'Selecciona una especie' }),
+  species: z.enum(['PERRO', 'GATO', 'OTRO'], { message: 'Selecciona una especie' }),
   breed: z.string().optional(),
-  ageMonths: z.coerce.number().int().min(0).optional().or(z.literal('')),
-  size: z.enum(['PEQUENO', 'MEDIANO', 'GRANDE'], { required_error: 'Selecciona un tamaño' }),
-  gender: z.enum(['MACHO', 'HEMBRA'], { required_error: 'Selecciona un género' }),
+  ageMonths: z.preprocess((val) => (val === '' || val === undefined ? undefined : Number(val)), z.number().int().min(0).optional()),
+  size: z.enum(['PEQUENO', 'MEDIANO', 'GRANDE'], { message: 'Selecciona un tamaño' }),
+  gender: z.enum(['MACHO', 'HEMBRA'], { message: 'Selecciona un género' }),
   city: z.string().min(1, 'La ciudad es requerida'),
   description: z.string().min(20, 'La descripción debe tener al menos 20 caracteres'),
   healthNotes: z.string().optional(),
-  vaccinated: z.boolean().default(false),
-  sterilized: z.boolean().default(false),
+  vaccinated: z.boolean().optional(),
+  sterilized: z.boolean().optional(),
 });
 
-type FormData = z.infer<typeof schema>;
+type FormData = z.input<typeof schema>;
 
 export default function NewAnimalPage() {
   const router = useRouter();
