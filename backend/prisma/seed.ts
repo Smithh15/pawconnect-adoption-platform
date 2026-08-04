@@ -6,6 +6,7 @@ import {
   Gender,
   AnimalStatus,
   RequestStatus,
+  type Animal,
 } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
@@ -297,7 +298,7 @@ async function main() {
     },
   ];
 
-  const animals = [];
+  const animals: Animal[] = [];
   for (const data of animalsData) {
     const { imageUrl, ...animalFields } = data;
     const animal = await prisma.animal.create({
