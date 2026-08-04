@@ -3,7 +3,7 @@
 Plataforma de adopción de mascotas que conecta fundaciones y rescatistas con adoptantes,
 gestionando el proceso completo de solicitud, aprobación y seguimiento.
 
-🔗 Demo: [pendiente — se agrega al terminar el despliegue]
+
 👤 Adoptante: demo@pawconnect.com / demo1234
 🏠 Fundación: fundacion@pawconnect.com / demo1234
 
