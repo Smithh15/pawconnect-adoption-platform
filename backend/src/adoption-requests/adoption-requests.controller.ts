@@ -10,6 +10,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { Role } from '@prisma/client';
+import { Throttle } from '@nestjs/throttler';
 import { AdoptionRequestsService } from './adoption-requests.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
@@ -26,6 +27,7 @@ export class AdoptionRequestsController {
   @Post()
   @UseGuards(RolesGuard)
   @Roles(Role.ADOPTANTE)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   create(
     @CurrentUser() user: { id: string },
     @Body() dto: CreateRequestDto,
