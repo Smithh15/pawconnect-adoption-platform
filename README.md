@@ -98,19 +98,21 @@ URL y el `publicId` en la base de datos.
 
 ## Cómo correrlo en local
 
-Requiere Node **20.18.0** (ver `.nvmrc`) y una base de datos PostgreSQL (local, o un proveedor
-gratuito como Neon/Supabase — el proyecto usa `DATABASE_URL` + `DIRECT_URL`, el patrón típico de
-un proveedor con pooler).
+Requiere Node **20.18.0** (ver `.nvmrc`), Docker (para Postgres local) y npm.
 
 ```bash
 git clone https://github.com/Smithh15/pawconnect-adoption-platform
 cd pawconnect-adoption-platform
 
+# 0. Base de datos (Postgres en Docker)
+docker compose up -d
+
 # 1. Backend
 cd backend
 cp .env.example .env
-# Completa DATABASE_URL, DIRECT_URL, JWT_SECRET, JWT_REFRESH_SECRET,
-# CLOUDINARY_* y SEED_ADMIN_PASSWORD (usa una contraseña real, no el valor de ejemplo)
+# DATABASE_URL y DIRECT_URL ya apuntan a localhost:5432 (ver docker-compose.yml) si usas los
+# mismos valores del .env.example. Completa JWT_SECRET, JWT_REFRESH_SECRET, CLOUDINARY_* y
+# SEED_ADMIN_PASSWORD (usa una contraseña real, no el valor de ejemplo)
 npm install
 npm run db:migrate     # aplica las migraciones de Prisma
 npm run db:seed        # carga los datos de demostración
