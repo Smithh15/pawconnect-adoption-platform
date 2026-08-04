@@ -24,7 +24,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       select: { id: true, email: true, name: true, role: true, status: true },
     });
 
-    if (!user || user.status === UserStatus.SUSPENDED) {
+    if (!user || user.status !== UserStatus.ACTIVE) {
       throw new UnauthorizedException('Usuario no autorizado');
     }
 

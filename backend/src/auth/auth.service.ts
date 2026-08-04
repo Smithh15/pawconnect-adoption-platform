@@ -90,6 +90,8 @@ export class AuthService {
 
     if (user.status === 'SUSPENDED')
       throw new UnauthorizedException('Tu cuenta ha sido suspendida');
+    if (user.status === 'DELETED')
+      throw new UnauthorizedException('Esta cuenta fue eliminada');
 
     const tokens = await this.generateTokens(user.id, user.email, user.role);
     return {
