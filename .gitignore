@@ -8,3 +8,4 @@ build/
 backend.log
 frontend.log
 *.log
+.claude/
