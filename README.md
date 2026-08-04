@@ -25,7 +25,7 @@ trazabilidad de principio a fin.
 - Detalle de mascota con galería de imágenes
 - Envío de solicitud de adopción con motivación
 - Panel con sus solicitudes y su estado (pendiente, aprobada, rechazada, cancelada, finalizada), con opción de cancelar
-- Edición de perfil y cambio de contraseña
+- Edición de perfil, cambio de contraseña y eliminación de cuenta propia
 
 **Fundación / rescatista**
 - Registro (queda pendiente de aprobación por un administrador antes de poder publicar)
@@ -94,6 +94,47 @@ solicitud, para que ambos cambios queden consistentes.
 **Imágenes en Cloudinary, no en el servidor:** Render usa almacenamiento efímero (se pierde en cada
 redeploy), así que las imágenes de mascotas se suben directamente a Cloudinary y solo se guarda la
 URL y el `publicId` en la base de datos.
+
+**Decisión conocida — el access token vive en `localStorage`:** el refresh token también. Es más
+simple de implementar que cookies `httpOnly`, pero significa que un XSS exitoso podría leer ambos
+tokens. La alternativa correcta — refresh token en cookie `httpOnly` + `secure` + `sameSite`, access
+token solo en memoria — requiere que el backend emita/lea esa cookie en login/refresh/logout y que
+el cliente deje de inyectar el header `Authorization` desde `localStorage`, lo cual es un cambio de
+punta a punta no trivial. Queda pendiente (ver [Estado y siguientes pasos](#estado-y-siguientes-pasos));
+mientras tanto, el `ValidationPipe` estricto, el rate limiting y CORS restringido a orígenes
+específicos reducen la superficie de ataque de XSS que podría explotar esto.
+
+## Seguridad
+
+Medidas ya implementadas, además de las validaciones de autorización por objeto (IDOR) en cada
+endpoint que opera sobre un recurso concreto (animales, imágenes, solicitudes):
+
+- `ValidationPipe` global con `whitelist`/`forbidNonWhitelisted`: el cliente no puede inyectar
+  campos como `role` o `status` en el cuerpo de una petición para escalar privilegios.
+- Rate limiting (`@nestjs/throttler`): 5 intentos/minuto en login, registro y refresh; 10/minuto en
+  creación de solicitudes de adopción; 100/minuto en el resto de la API.
+- `helmet`, límite de tamaño de petición (1MB) y CORS restringido a los orígenes de `FRONTEND_URL`
+  (admite varios separados por coma, para producción + previews).
+- Subida de imágenes: solo rescatistas autenticados, máximo 6 por animal, 5MB por archivo, y se
+  valida la firma real de bytes del archivo (no el `Content-Type` ni la extensión, ambos
+  controlados por quien hace la petición).
+- Ninguna respuesta de la API incluye el hash de la contraseña ni el refresh token guardado.
+- Mensajes de error de login genéricos ("credenciales incorrectas") tanto si el correo no existe
+  como si la contraseña es incorrecta, para no revelar qué correos están registrados.
+- Eliminación de cuenta propia (`DELETE /users/me`, confirmando con contraseña): anonimiza nombre,
+  correo y teléfono en vez de borrar la fila, para no romper el historial de solicitudes/moderación;
+  bloqueada si hay solicitudes o animales sin resolver. Política de tratamiento de datos en
+  `/privacidad` (texto de referencia — reemplázalo por uno legal real antes de operar con usuarios
+  reales).
+
+**Backups:** los datos ahora pueden ser reales (contacto de personas, fichas de animales). Revisa
+la retención que ofrece tu proveedor de Postgres en el plan gratuito (por ejemplo, Neon no garantiza
+respaldo indefinido en su capa free) y no asumas que existe un backup automático. Como mínimo, corre
+`pg_dump` manualmente de forma periódica:
+
+```bash
+pg_dump "$DATABASE_URL" -F c -f "backup_$(date +%Y%m%d).dump"
+```
 
 ## Cómo correrlo en local
 
@@ -188,5 +229,7 @@ logout, protección de rutas en servidor (`proxy.ts`), y stats públicas reales 
 
 **Pendiente:**
 - Suspender/reactivar usuarios y ver estadísticas agregadas desde el frontend (hoy solo vía API; la aprobación de rescatistas sí tiene panel)
+- Mover el access/refresh token de `localStorage` a cookie `httpOnly` (ver [Decisiones técnicas](#decisiones-técnicas))
+- Reemplazar el texto de referencia de `/privacidad` por una política de tratamiento de datos real
 - Notificaciones por correo (ej. cuando una solicitud es aprobada o rechazada)
 - Tests automatizados de los flujos principales
