@@ -6,7 +6,8 @@ import cookieParser = require('cookie-parser');
 import { AppModule } from './app.module';
 
 // FRONTEND_URL admite una o varias URLs separadas por coma (produccion + previews de Vercel).
-const allowedOrigins = (process.env.FRONTEND_URL ?? 'http://localhost:3000')
+// Ojo: "||" y no "??", porque una env var vacia ("") no es undefined y no activaria el fallback.
+const allowedOrigins = (process.env.FRONTEND_URL || 'http://localhost:3000')
   .split(',')
   .map((origin) => origin.trim())
   .filter(Boolean);
