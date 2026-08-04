@@ -63,6 +63,23 @@ export interface PaginatedAnimals {
   };
 }
 
+export interface PendingRescuerProfile {
+  id: string;
+  organizationName?: string;
+  description?: string;
+  city: string;
+  country: string;
+  website?: string;
+  status: RescuerStatus;
+  createdAt: string;
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    phone?: string;
+  };
+}
+
 export interface AdoptionRequest {
   id: string;
   motivation: string;

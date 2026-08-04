@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth.store';
 import { AdopterDashboard } from './adopter-dashboard';
 import { RescuerDashboard } from './rescuer-dashboard';
+import { AdminDashboard } from './admin-dashboard';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -16,6 +17,7 @@ export default function DashboardPage() {
 
   if (!user) return null;
 
+  if (user.role === 'ADMIN') return <AdminDashboard />;
   if (user.role === 'RESCATISTA') return <RescuerDashboard />;
   return <AdopterDashboard />;
 }
