@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, InternalServerErrorException } from '@nestjs/common';
+import { BadRequestException, Injectable, InternalServerErrorException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { v2 as cloudinary, UploadApiResponse } from 'cloudinary';
 
@@ -26,6 +26,8 @@ function isValidImageSignature(buffer: Buffer): boolean {
 
 @Injectable()
 export class UploadService {
+  private readonly logger = new Logger(UploadService.name);
+
   constructor(private configService: ConfigService) {
     cloudinary.config({
       cloud_name: this.configService.getOrThrow('CLOUDINARY_CLOUD_NAME'),
@@ -51,6 +53,7 @@ export class UploadService {
         },
         (error, result: UploadApiResponse | undefined) => {
           if (error || !result) {
+            this.logger.error(`Cloudinary upload failed: ${error?.message ?? 'sin resultado'}`, error?.stack);
             reject(new InternalServerErrorException('Error al subir imagen'));
             return;
           }
