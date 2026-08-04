@@ -1,17 +1,26 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { User, Lock } from 'lucide-react';
+import { User, Lock, TriangleAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
 import type { User as UserType } from '@/lib/types';
@@ -37,7 +46,10 @@ type PasswordData = z.infer<typeof passwordSchema>;
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { user, setAuth, accessToken, refreshToken, isAuthenticated } = useAuthStore();
+  const { user, setAuth, accessToken, refreshToken, isAuthenticated, clearAuth } = useAuthStore();
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated()) router.push('/login');
@@ -73,6 +85,21 @@ export default function ProfilePage() {
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
       toast.error(msg ?? 'Error al cambiar la contraseña');
+    }
+  }
+
+  async function handleDeleteAccount() {
+    setDeleting(true);
+    try {
+      await api.delete('/users/me', { data: { password: deletePassword } });
+      toast.success('Tu cuenta fue eliminada');
+      clearAuth();
+      router.push('/');
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      toast.error(msg ?? 'Error al eliminar la cuenta');
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -159,6 +186,60 @@ export default function ProfilePage() {
               {passwordForm.formState.isSubmitting ? 'Actualizando...' : 'Cambiar contraseña'}
             </Button>
           </form>
+        </CardContent>
+      </Card>
+
+      <Separator />
+
+      {/* Zona de peligro */}
+      <Card className="border-destructive/40">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base text-destructive">
+            <TriangleAlert className="h-4 w-4" />
+            Eliminar cuenta
+          </CardTitle>
+          <CardDescription>
+            Esta acción no se puede deshacer. Tu nombre, correo y teléfono se eliminan
+            permanentemente.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+            <DialogTrigger render={<Button variant="destructive" />}>
+              Eliminar mi cuenta
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>¿Eliminar tu cuenta permanentemente?</DialogTitle>
+                <DialogDescription>
+                  Ingresa tu contraseña para confirmar. Si tienes solicitudes de adopción
+                  pendientes o aprobadas, o animales publicados sin finalizar, primero debes
+                  resolverlos.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-1.5">
+                <Label htmlFor="deletePassword">Contraseña</Label>
+                <Input
+                  id="deletePassword"
+                  type="password"
+                  value={deletePassword}
+                  onChange={(e) => setDeletePassword(e.target.value)}
+                />
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setDeleteOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button
+                  variant="destructive"
+                  disabled={deleting || !deletePassword}
+                  onClick={handleDeleteAccount}
+                >
+                  {deleting ? 'Eliminando...' : 'Eliminar definitivamente'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </CardContent>
       </Card>
     </div>
