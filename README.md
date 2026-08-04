@@ -34,10 +34,9 @@ trazabilidad de principio a fin.
 - Panel con las solicitudes de adopción recibidas
 - Aprobar, rechazar, finalizar o dejar en curso una solicitud — el estado de la mascota se actualiza automáticamente (ver [Decisiones técnicas](#decisiones-técnicas))
 
-**Administrador** (disponible vía API, sin panel en el frontend — ver [Estado y siguientes pasos](#estado-y-siguientes-pasos))
-- Aprobar o rechazar perfiles de rescatista pendientes
-- Suspender o reactivar usuarios
-- Ver estadísticas agregadas de la plataforma
+**Administrador**
+- Panel con los rescatistas pendientes de aprobación, con botones para aprobar o rechazar
+- Suspender o reactivar usuarios, y ver estadísticas agregadas — estas dos disponibles vía API, sin pantalla propia todavía (ver [Estado y siguientes pasos](#estado-y-siguientes-pasos))
 
 **Público**
 - Estadísticas reales en la landing (mascotas disponibles, adopciones finalizadas, fundaciones activas) vía `GET /api/stats`
@@ -175,7 +174,7 @@ pawconnect-adoption-platform/
 │   ├── components/                 componentes UI (shadcn/ui) y navbar
 │   ├── store/                      estado global de autenticación (Zustand)
 │   ├── lib/                        cliente axios, tipos compartidos, utilidades
-│   └── middleware.ts               protección de rutas privadas en servidor
+│   └── proxy.ts                    protección de rutas privadas en servidor
 ├── docs/                        capturas y GIF de demo
 └── render.yaml                  blueprint de despliegue (Postgres + API + frontend)
 ```
@@ -183,11 +182,11 @@ pawconnect-adoption-platform/
 ## Estado y siguientes pasos
 
 **Implementado:** el flujo completo adoptante → fundación (registro, login, listado y detalle de
-mascotas, solicitud de adopción, aprobación/rechazo/finalización, panel de ambos roles), gestión de
-imágenes vía Cloudinary, revocación de sesión en logout, protección de rutas en middleware, y stats
-públicas reales en la landing.
+mascotas, solicitud de adopción, aprobación/rechazo/finalización, panel de los tres roles incluyendo
+aprobación de rescatistas por un admin), gestión de imágenes vía Cloudinary, revocación de sesión en
+logout, protección de rutas en servidor (`proxy.ts`), y stats públicas reales en la landing.
 
 **Pendiente:**
-- Panel de administración en el frontend (hoy la aprobación de rescatistas y la suspensión de usuarios solo son accesibles vía API)
+- Suspender/reactivar usuarios y ver estadísticas agregadas desde el frontend (hoy solo vía API; la aprobación de rescatistas sí tiene panel)
 - Notificaciones por correo (ej. cuando una solicitud es aprobada o rechazada)
 - Tests automatizados de los flujos principales
