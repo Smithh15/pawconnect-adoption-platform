@@ -28,6 +28,9 @@ const schema = z.object({
   organizationName: z.string().optional(),
   description: z.string().optional(),
   website: z.string().url('URL inválida').optional().or(z.literal('')),
+  acceptedTerms: z
+    .boolean()
+    .refine((v) => v === true, 'Debes aceptar la política de tratamiento de datos'),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -45,8 +48,9 @@ export default function RegisterRescuerPage() {
 
   async function onSubmit(data: FormData) {
     try {
+      const { acceptedTerms: _acceptedTerms, ...rest } = data;
       const payload = {
-        ...data,
+        ...rest,
         website: data.website || undefined,
         organizationName: data.organizationName || undefined,
         description: data.description || undefined,
@@ -171,6 +175,25 @@ export default function RegisterRescuerPage() {
                 <p className="text-xs text-destructive">{errors.website.message}</p>
               )}
             </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="flex items-start gap-2 text-sm text-muted-foreground">
+              <input
+                type="checkbox"
+                className="mt-0.5 h-4 w-4 shrink-0 rounded border-input"
+                {...register('acceptedTerms')}
+              />
+              <span>
+                Acepto la{' '}
+                <Link href="/privacidad" target="_blank" className="text-primary hover:underline">
+                  política de tratamiento de datos
+                </Link>
+              </span>
+            </label>
+            {errors.acceptedTerms && (
+              <p className="text-xs text-destructive">{errors.acceptedTerms.message}</p>
+            )}
           </div>
 
           <Button type="submit" className="w-full" disabled={isSubmitting}>

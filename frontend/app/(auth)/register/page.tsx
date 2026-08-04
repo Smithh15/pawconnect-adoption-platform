@@ -20,6 +20,9 @@ const schema = z.object({
   email: z.string().email('Correo inválido'),
   password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres'),
   phone: z.string().optional(),
+  acceptedTerms: z
+    .boolean()
+    .refine((v) => v === true, 'Debes aceptar la política de tratamiento de datos'),
 });
 
 type FormData = z.infer<typeof schema>;
@@ -34,7 +37,8 @@ export default function RegisterPage() {
 
   async function onSubmit(data: FormData) {
     try {
-      const res = await api.post<AuthTokens>('/auth/register', data);
+      const { acceptedTerms: _acceptedTerms, ...payload } = data;
+      const res = await api.post<AuthTokens>('/auth/register', payload);
       setAuth(res.data.user, res.data.accessToken, res.data.refreshToken);
       toast.success('¡Cuenta creada exitosamente!');
       router.push('/dashboard');
@@ -74,6 +78,24 @@ export default function RegisterPage() {
             <div className="space-y-1.5">
               <Label htmlFor="phone">Teléfono <span className="text-muted-foreground">(opcional)</span></Label>
               <Input id="phone" placeholder="+57 300 123 4567" {...register('phone')} />
+            </div>
+            <div className="space-y-1.5">
+              <label className="flex items-start gap-2 text-sm text-muted-foreground">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 h-4 w-4 shrink-0 rounded border-input"
+                  {...register('acceptedTerms')}
+                />
+                <span>
+                  Acepto la{' '}
+                  <Link href="/privacidad" target="_blank" className="text-primary hover:underline">
+                    política de tratamiento de datos
+                  </Link>
+                </span>
+              </label>
+              {errors.acceptedTerms && (
+                <p className="text-xs text-destructive">{errors.acceptedTerms.message}</p>
+              )}
             </div>
             <Button type="submit" className="w-full" disabled={isSubmitting}>
               {isSubmitting ? 'Creando cuenta...' : 'Crear cuenta'}
