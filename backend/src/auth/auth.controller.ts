@@ -5,6 +5,7 @@ import { RegisterRescuerDto } from './dto/register-rescuer.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @Controller('auth')
 export class AuthController {
@@ -35,7 +36,7 @@ export class AuthController {
   @Post('logout')
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.OK)
-  logout() {
-    return { message: 'Sesión cerrada exitosamente' };
+  logout(@CurrentUser() user: { id: string }) {
+    return this.authService.logout(user.id);
   }
 }

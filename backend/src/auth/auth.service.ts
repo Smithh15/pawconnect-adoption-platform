@@ -112,6 +112,20 @@ export class AuthService {
       if (payload.type !== 'refresh')
         throw new UnauthorizedException('Token inválido');
 
+      const user = await this.prisma.user.findUnique({
+        where: { id: payload.sub },
+        select: { hashedRefreshToken: true },
+      });
+
+      if (!user?.hashedRefreshToken) {
+        throw new UnauthorizedException('Sesión cerrada, inicia sesión nuevamente');
+      }
+
+      const tokenMatches = await bcrypt.compare(refreshToken, user.hashedRefreshToken);
+      if (!tokenMatches) {
+        throw new UnauthorizedException('Refresh token inválido o expirado');
+      }
+
       const accessToken = await this.jwtService.signAsync(
         { sub: payload.sub, email: payload.email, role: payload.role },
         {
@@ -121,9 +135,18 @@ export class AuthService {
       );
 
       return { accessToken };
-    } catch {
+    } catch (err) {
+      if (err instanceof UnauthorizedException) throw err;
       throw new UnauthorizedException('Refresh token inválido o expirado');
     }
+  }
+
+  async logout(userId: string) {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { hashedRefreshToken: null },
+    });
+    return { message: 'Sesión cerrada exitosamente' };
   }
 
   private async generateTokens(userId: string, email: string, role: Role) {
@@ -142,6 +165,12 @@ export class AuthService {
         },
       ),
     ]);
+
+    const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { hashedRefreshToken },
+    });
 
     return { accessToken, refreshToken };
   }

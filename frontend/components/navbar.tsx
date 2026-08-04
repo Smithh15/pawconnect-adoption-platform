@@ -13,12 +13,18 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useAuthStore } from '@/store/auth.store';
+import { api } from '@/lib/api';
 
 export function Navbar() {
   const router = useRouter();
   const { user, clearAuth, isAuthenticated } = useAuthStore();
 
-  function handleLogout() {
+  async function handleLogout() {
+    try {
+      await api.post('/auth/logout');
+    } catch {
+      // Si la llamada falla (red, token ya vencido) igual cerramos la sesión localmente.
+    }
     clearAuth();
     router.push('/');
   }
