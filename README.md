@@ -1,0 +1,191 @@
+# PawConnect
+
+Plataforma de adopción de mascotas que conecta fundaciones y rescatistas con adoptantes,
+gestionando el proceso completo de solicitud, aprobación y seguimiento.
+
+🔗 Demo: [pendiente — se agrega al terminar el despliegue]
+👤 Adoptante: demo@pawconnect.com / demo1234
+🏠 Fundación: fundacion@pawconnect.com / demo1234
+
+![Demo](docs/demo.gif)
+
+## El problema
+
+Muchas fundaciones y rescatistas gestionan sus adopciones por WhatsApp, redes sociales y
+formularios sueltos: no hay un lugar único donde ver qué mascotas están disponibles, quién
+solicitó cuál, ni en qué estado quedó cada solicitud. PawConnect centraliza ese flujo — desde
+que el adoptante ve la mascota hasta que la fundación aprueba o rechaza la solicitud — con
+trazabilidad de principio a fin.
+
+## Funcionalidades
+
+**Adoptante**
+- Registro e inicio de sesión
+- Listado de mascotas disponibles con filtros (especie, tamaño, género, ciudad) y paginación
+- Detalle de mascota con galería de imágenes
+- Envío de solicitud de adopción con motivación
+- Panel con sus solicitudes y su estado (pendiente, aprobada, rechazada, cancelada, finalizada), con opción de cancelar
+- Edición de perfil y cambio de contraseña
+
+**Fundación / rescatista**
+- Registro (queda pendiente de aprobación por un administrador antes de poder publicar)
+- Publicación de mascotas con múltiples imágenes (Cloudinary)
+- Edición y eliminación de mascotas e imágenes propias
+- Panel con las solicitudes de adopción recibidas
+- Aprobar, rechazar, finalizar o dejar en curso una solicitud — el estado de la mascota se actualiza automáticamente (ver [Decisiones técnicas](#decisiones-técnicas))
+
+**Administrador** (disponible vía API, sin panel en el frontend — ver [Estado y siguientes pasos](#estado-y-siguientes-pasos))
+- Aprobar o rechazar perfiles de rescatista pendientes
+- Suspender o reactivar usuarios
+- Ver estadísticas agregadas de la plataforma
+
+**Público**
+- Estadísticas reales en la landing (mascotas disponibles, adopciones finalizadas, fundaciones activas) vía `GET /api/stats`
+
+## Stack
+
+**Backend:** NestJS 11, Prisma 5, PostgreSQL, JWT (access + refresh token con revocación en logout), Cloudinary
+**Frontend:** Next.js 16 (App Router), React 19, Tailwind CSS 4, shadcn/ui, Zustand, react-hook-form + zod, axios
+**Despliegue:** Render (Blueprint: PostgreSQL + API + frontend)
+
+## Arquitectura
+
+```mermaid
+flowchart LR
+    Client["Next.js (App Router)"] -->|HTTPS, JSON| API["API NestJS (/api)"]
+    API --> DB[("PostgreSQL")]
+    API --> Cloud[("Cloudinary")]
+```
+
+## Modelo de datos
+
+```mermaid
+erDiagram
+    USER ||--o| RESCUER_PROFILE : "tiene (si es rescatista)"
+    USER ||--o{ ADOPTION_REQUEST : "solicita (adoptante)"
+    USER ||--o{ MODERATION_LOG : "ejecuta (admin)"
+    USER ||--o{ RESCUER_PROFILE : "aprueba (admin)"
+    RESCUER_PROFILE ||--o{ ANIMAL : "publica"
+    ANIMAL ||--o{ ANIMAL_IMAGE : "tiene"
+    ANIMAL ||--o{ ADOPTION_REQUEST : "recibe"
+```
+
+6 entidades: `User`, `RescuerProfile`, `Animal`, `AnimalImage`, `AdoptionRequest`, `ModerationLog`
+(esta última registra cada acción de moderación de un admin: aprobar/rechazar rescatistas, suspender/activar usuarios).
+
+## Decisiones técnicas
+
+**NestJS** se eligió por su estructura modular con inyección de dependencias: cada dominio
+(auth, animals, adoption-requests, admin...) queda separado en controller/service/DTOs, y los
+guards de rol (`@Roles(...)`) se declaran de forma explícita sobre cada endpoint — importante en
+una app con tres roles (adoptante, rescatista, admin) y reglas de autorización distintas por recurso.
+
+**Access + refresh tokens con revocación:** el access token vive 15 minutos para limitar el daño
+si se filtra; el refresh token vive 7 días para no forzar un login frecuente. El hash del refresh
+token vigente se guarda en `User.hashedRefreshToken`, así que `POST /auth/logout` puede invalidarlo
+de verdad del lado del servidor (antes de este cambio, el logout no revocaba nada: el refresh token
+seguía siendo válido hasta su expiración natural aunque el usuario "cerrara sesión").
+
+**Ciclo de estados de la mascota** (`DISPONIBLE → EN_PROCESO → ADOPTADO`, con vuelta a `DISPONIBLE`
+si se cancela una solicitud aprobada): al aprobar una solicitud, la mascota pasa a `EN_PROCESO`
+para que no reciba más solicitudes activas mientras se coordina la entrega; al finalizar, pasa a
+`ADOPTADO`. Esta transición ocurre en una transacción de Prisma junto con la actualización de la
+solicitud, para que ambos cambios queden consistentes.
+
+**Imágenes en Cloudinary, no en el servidor:** Render usa almacenamiento efímero (se pierde en cada
+redeploy), así que las imágenes de mascotas se suben directamente a Cloudinary y solo se guarda la
+URL y el `publicId` en la base de datos.
+
+## Cómo correrlo en local
+
+Requiere Node **20.18.0** (ver `.nvmrc`) y una base de datos PostgreSQL (local, o un proveedor
+gratuito como Neon/Supabase — el proyecto usa `DATABASE_URL` + `DIRECT_URL`, el patrón típico de
+un proveedor con pooler).
+
+```bash
+git clone https://github.com/Smithh15/pawconnect-adoption-platform
+cd pawconnect-adoption-platform
+
+# 1. Backend
+cd backend
+cp .env.example .env
+# Completa DATABASE_URL, DIRECT_URL, JWT_SECRET, JWT_REFRESH_SECRET,
+# CLOUDINARY_* y SEED_ADMIN_PASSWORD (usa una contraseña real, no el valor de ejemplo)
+npm install
+npm run db:migrate     # aplica las migraciones de Prisma
+npm run db:seed        # carga los datos de demostración
+npm run start:dev      # http://localhost:4000/api
+
+# 2. Frontend (en otra terminal)
+cd frontend
+cp .env.example .env.local
+# NEXT_PUBLIC_API_URL=http://localhost:4000/api
+npm install
+npm run dev             # http://localhost:3000
+```
+
+Inicia sesión con `demo@pawconnect.com` / `demo1234` (adoptante) o
+`fundacion@pawconnect.com` / `demo1234` (fundación).
+
+## Despliegue en Render
+
+El repositorio incluye un [`render.yaml`](render.yaml) (Blueprint) que declara los tres servicios:
+una base PostgreSQL, la API (`pawconnect-api`) y el frontend (`pawconnect-frontend`). Al crear el
+Blueprint desde el panel de Render (New → Blueprint, apuntando a este repo), lo siguiente queda
+automático:
+
+- Creación de la base de datos y conexión de `DATABASE_URL`/`DIRECT_URL` a la API
+- `JWT_SECRET` y `JWT_REFRESH_SECRET` generados automáticamente
+- Build de la API con `prisma migrate deploy` incluido (las migraciones se aplican en cada deploy)
+
+Pasos manuales que quedan pendientes en el panel de Render después de crear el Blueprint:
+
+1. En `pawconnect-api`, completar `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY` y `CLOUDINARY_API_SECRET` con las credenciales de una cuenta de Cloudinary.
+2. En `pawconnect-api`, completar `FRONTEND_URL` con la URL pública que Render asigna a `pawconnect-frontend` (necesaria para CORS).
+3. En `pawconnect-frontend`, completar `NEXT_PUBLIC_API_URL` con la URL pública de `pawconnect-api` seguida de `/api` (ej. `https://pawconnect-api.onrender.com/api`).
+4. Correr el seed una vez que la API esté desplegada: desde la Shell de Render del servicio `pawconnect-api`, definir `SEED_ADMIN_EMAIL`/`SEED_ADMIN_PASSWORD` como variables de entorno y ejecutar `npm run db:seed`.
+5. Redesplegar `pawconnect-api` y `pawconnect-frontend` después de completar las variables de los pasos 1-3 (Render no reinicia automáticamente al editar variables de servicios ya desplegados en el mismo blueprint apply).
+
+## Estructura del proyecto
+
+```
+pawconnect-adoption-platform/
+├── backend/                     API NestJS
+│   ├── src/
+│   │   ├── auth/                 registro, login, refresh y logout (JWT)
+│   │   ├── users/                perfil del usuario autenticado
+│   │   ├── rescuers/              perfil de fundación/rescatista
+│   │   ├── animals/               CRUD de mascotas e imágenes
+│   │   ├── adoption-requests/     solicitudes de adopción y su ciclo de estados
+│   │   ├── admin/                 aprobación de rescatistas, suspensión de usuarios
+│   │   ├── stats/                 estadísticas públicas para la landing
+│   │   ├── upload/                integración con Cloudinary
+│   │   ├── prisma/                cliente de base de datos (PrismaService)
+│   │   └── common/                guards y decoradores compartidos (roles, JWT)
+│   └── prisma/
+│       ├── schema.prisma          modelo de datos
+│       ├── migrations/
+│       └── seed.ts                datos de demostración
+├── frontend/                    Next.js (App Router)
+│   ├── app/
+│   │   ├── (auth)/                 login, registro de adoptante y de fundación
+│   │   └── (main)/                 landing, mascotas, dashboard, perfil
+│   ├── components/                 componentes UI (shadcn/ui) y navbar
+│   ├── store/                      estado global de autenticación (Zustand)
+│   ├── lib/                        cliente axios, tipos compartidos, utilidades
+│   └── middleware.ts               protección de rutas privadas en servidor
+├── docs/                        capturas y GIF de demo
+└── render.yaml                  blueprint de despliegue (Postgres + API + frontend)
+```
+
+## Estado y siguientes pasos
+
+**Implementado:** el flujo completo adoptante → fundación (registro, login, listado y detalle de
+mascotas, solicitud de adopción, aprobación/rechazo/finalización, panel de ambos roles), gestión de
+imágenes vía Cloudinary, revocación de sesión en logout, protección de rutas en middleware, y stats
+públicas reales en la landing.
+
+**Pendiente:**
+- Panel de administración en el frontend (hoy la aprobación de rescatistas y la suspensión de usuarios solo son accesibles vía API)
+- Notificaciones por correo (ej. cuando una solicitud es aprobada o rechazada)
+- Tests automatizados de los flujos principales
