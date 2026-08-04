@@ -22,11 +22,16 @@ export const useAuthStore = create<AuthState>()(
       setAuth: (user, accessToken, refreshToken) => {
         localStorage.setItem('accessToken', accessToken);
         localStorage.setItem('refreshToken', refreshToken);
+        // Cookie legible por el middleware (Next.js no puede leer localStorage en el servidor).
+        // Solo indica sesión/rol para decidir redirecciones; la autorización real sigue
+        // viajando en el header Authorization con el accessToken.
+        document.cookie = `pc_role=${user.role}; path=/; max-age=${60 * 60 * 24 * 7}; samesite=lax`;
         set({ user, accessToken, refreshToken });
       },
       clearAuth: () => {
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
+        document.cookie = 'pc_role=; path=/; max-age=0';
         set({ user: null, accessToken: null, refreshToken: null });
       },
       isAuthenticated: () => !!get().accessToken,
