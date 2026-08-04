@@ -1,8 +1,35 @@
+'use client';
+
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import { PawPrint, Heart, ShieldCheck, ArrowRight } from 'lucide-react';
 import { buttonVariants } from '@/components/ui/button';
+import { api } from '@/lib/api';
+
+interface PublicStats {
+  availableAnimals: number;
+  finalizedAdoptions: number;
+  approvedRescuers: number;
+}
 
 export default function HomePage() {
+  const [stats, setStats] = useState<PublicStats | null>(null);
+
+  useEffect(() => {
+    api
+      .get<PublicStats>('/stats')
+      .then((res) => setStats(res.data))
+      .catch(() => setStats(null));
+  }, []);
+
+  const statItems = stats
+    ? [
+        { value: stats.availableAnimals, label: 'Animales disponibles' },
+        { value: stats.finalizedAdoptions, label: 'Adopciones finalizadas' },
+        { value: stats.approvedRescuers, label: 'Fundaciones activas' },
+      ]
+    : [];
+
   return (
     <div className="flex flex-col">
 
@@ -41,20 +68,18 @@ export default function HomePage() {
       </section>
 
       {/* ── Stats ──────────────────────────────────────────── */}
-      <section className="border-y bg-white px-4 py-10">
-        <div className="container mx-auto grid grid-cols-3 gap-6 max-w-2xl">
-          {[
-            { value: '500+', label: 'Animales rescatados' },
-            { value: '200+', label: 'Adopciones exitosas' },
-            { value: '50+',  label: 'Rescatistas activos' },
-          ].map((stat) => (
-            <div key={stat.label} className="flex flex-col items-center gap-1 text-center">
-              <span className="text-3xl font-black text-amber-500">{stat.value}</span>
-              <span className="text-xs text-slate-400 font-medium">{stat.label}</span>
-            </div>
-          ))}
-        </div>
-      </section>
+      {statItems.length > 0 && (
+        <section className="border-y bg-white px-4 py-10">
+          <div className="container mx-auto grid grid-cols-3 gap-6 max-w-2xl">
+            {statItems.map((stat) => (
+              <div key={stat.label} className="flex flex-col items-center gap-1 text-center">
+                <span className="text-3xl font-black text-amber-500">{stat.value}</span>
+                <span className="text-xs text-slate-400 font-medium">{stat.label}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* ── Por qué adoptar ────────────────────────────────── */}
       <section className="bg-white px-4 py-20">
