@@ -4,7 +4,7 @@ import type { NextRequest } from 'next/server';
 const PROTECTED_PATHS = ['/dashboard', '/profile', '/animals/new'];
 const RESCUER_ONLY_PATHS = ['/animals/new'];
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   const role = request.cookies.get('pc_role')?.value;
