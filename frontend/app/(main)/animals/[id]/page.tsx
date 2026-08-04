@@ -11,6 +11,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { ImageCropDialog } from '@/components/image-crop-dialog';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/auth.store';
 import type { Animal } from '@/lib/types';
@@ -33,6 +34,7 @@ export default function AnimalDetailPage() {
   const [submitting, setSubmitting] = useState(false);
   const [requested, setRequested] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -75,15 +77,26 @@ export default function AnimalDetailPage() {
 
   if (!animal) return null;
 
-  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+  function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) {
       toast.error('La imagen no puede superar 5MB');
+      if (fileInputRef.current) fileInputRef.current.value = '';
       return;
     }
+    setCropImageSrc(URL.createObjectURL(file));
+  }
+
+  function closeCropDialog() {
+    if (cropImageSrc) URL.revokeObjectURL(cropImageSrc);
+    setCropImageSrc(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  }
+
+  async function handleCropConfirm(blob: Blob) {
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('file', blob, 'foto.jpg');
     setUploading(true);
     try {
       await api.post(`/animals/${id}/images`, formData, {
@@ -92,12 +105,12 @@ export default function AnimalDetailPage() {
       const updated = await api.get<Animal>(`/animals/${id}`);
       setAnimal(updated.data);
       toast.success('Foto subida');
+      closeCropDialog();
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
       toast.error(msg ?? 'Error al subir la foto');
     } finally {
       setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   }
 
@@ -379,6 +392,13 @@ export default function AnimalDetailPage() {
           </Card>
         </div>
       </div>
+
+      <ImageCropDialog
+        imageSrc={cropImageSrc}
+        onClose={closeCropDialog}
+        onConfirm={handleCropConfirm}
+        confirming={uploading}
+      />
     </div>
   );
 }
