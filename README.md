@@ -3,19 +3,28 @@
 Plataforma de adopción de mascotas que conecta fundaciones y rescatistas con adoptantes,
 gestionando el proceso completo de solicitud, aprobación y seguimiento.
 
-
-👤 Adoptante: demo@pawconnect.com / demo1234
-🏠 Fundación: fundacion@pawconnect.com / demo1234
-
-![Demo](docs/demo.gif)
+🔗 Demo: pendiente — se agrega cuando el catálogo tenga fotos reales cargadas
 
 ## El problema
 
-Muchas fundaciones y rescatistas gestionan sus adopciones por WhatsApp, redes sociales y
-formularios sueltos: no hay un lugar único donde ver qué mascotas están disponibles, quién
-solicitó cuál, ni en qué estado quedó cada solicitud. PawConnect centraliza ese flujo — desde
-que el adoptante ve la mascota hasta que la fundación aprueba o rechaza la solicitud — con
-trazabilidad de principio a fin.
+Mi familia rescata perros y los publica en una cuenta de Instagram
+([@VidasPeludasConFlow](https://www.instagram.com/rescatados_con_flow/)). Instagram sirve para que
+la gente vea a los perros, pero no para lo que viene después: las solicitudes llegan por mensajes
+directos y se mezclan con saludos, preguntas sueltas y gente que solo quiere ayudar. Una
+publicación de hace tres semanas sigue circulando aunque ese perro ya tenga hogar, así que llegan
+mensajes por perros que ya no están disponibles. No hay forma de saber cuántas personas
+preguntaron por el mismo perro, en qué punto va cada conversación, ni a quién se le quedó de
+responder — y cuando alguien interesado no recibe respuesta en un par de días, se enfría y no
+vuelve a escribir.
+
+El problema nunca fue la falta de gente dispuesta a adoptar. Era que el canal por donde llegaba
+esa gente no estaba hecho para hacerle seguimiento a nada. PawConnect es el intento de arreglar
+esa parte: cada mascota tiene una ficha con su estado (disponible, en proceso, adoptada) que se
+actualiza sola según avanzan las solicitudes, y cada solicitud queda registrada con fecha e
+historial en vez de perderse entre mensajes.
+
+Es un proyecto personal, hecho por una sola persona, y está en uso real con perros reales
+buscando hogar.
 
 ## Funcionalidades
 
@@ -128,9 +137,8 @@ endpoint que opera sobre un recurso concreto (animales, imágenes, solicitudes):
   reales).
 
 **Backups:** los datos ahora pueden ser reales (contacto de personas, fichas de animales). Revisa
-la retención que ofrece tu proveedor de Postgres en el plan gratuito (por ejemplo, Neon no garantiza
-respaldo indefinido en su capa free) y no asumas que existe un backup automático. Como mínimo, corre
-`pg_dump` manualmente de forma periódica:
+la retención que ofrece tu proveedor de Postgres en el plan gratuito y no asumas que existe un
+backup automático. Como mínimo, corre `pg_dump` manualmente de forma periódica:
 
 ```bash
 pg_dump "$DATABASE_URL" -F c -f "backup_$(date +%Y%m%d).dump"
