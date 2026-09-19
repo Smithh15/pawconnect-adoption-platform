@@ -13,6 +13,7 @@ import { AdoptionRequestsModule } from './adoption-requests/adoption-requests.mo
 import { AdminModule } from './admin/admin.module';
 import { UploadModule } from './upload/upload.module';
 import { StatsModule } from './stats/stats.module';
+import { AiModule } from './ai/ai.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { StatsModule } from './stats/stats.module';
     AdminModule,
     UploadModule,
     StatsModule,
+    AiModule,
   ],
   controllers: [AppController],
   providers: [
