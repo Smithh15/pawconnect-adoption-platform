@@ -43,6 +43,13 @@ services:
         sync: false
       - key: FRONTEND_URL
         sync: false
+      - key: LLM_PROVIDER
+        value: gemini
+      - key: GEMINI_MODEL
+        value: gemini-3.6-flash
+      # Se carga manualmente en el panel de Render (ver README, seccion Despliegue)
+      - key: GEMINI_API_KEY
+        sync: false
       # Solo se usan si corres "npm run db:seed" manualmente desde el Shell de Render
       - key: SEED_ADMIN_EMAIL
         sync: false

@@ -39,6 +39,7 @@ buscando hogar.
 **Fundación / rescatista**
 - Registro (queda pendiente de aprobación por un administrador antes de poder publicar)
 - Publicación de mascotas con múltiples imágenes (Cloudinary)
+- Botón "Generar con IA" en el formulario de publicación: redacta la descripción a partir de los datos del animal (y de las notas que el rescatista ya haya escrito). El texto queda editable, con opción de deshacer, antes de publicar (ver [Descripciones con IA](#descripciones-con-ia))
 - Edición y eliminación de mascotas e imágenes propias
 - Panel con las solicitudes de adopción recibidas
 - Aprobar, rechazar, finalizar o dejar en curso una solicitud — el estado de la mascota se actualiza automáticamente (ver [Decisiones técnicas](#decisiones-técnicas))
@@ -52,7 +53,7 @@ buscando hogar.
 
 ## Stack
 
-**Backend:** NestJS 11, Prisma 5, PostgreSQL, JWT (access + refresh token con revocación en logout), Cloudinary
+**Backend:** NestJS 11, Prisma 5, PostgreSQL, JWT (access + refresh token con revocación en logout), Cloudinary, Google Gemini (descripciones con IA)
 **Frontend:** Next.js 16 (App Router), React 19, Tailwind CSS 4, shadcn/ui, Zustand, react-hook-form + zod, axios
 **Despliegue:** Render (Blueprint: PostgreSQL + API + frontend)
 
@@ -63,6 +64,7 @@ flowchart LR
     Client["Next.js (App Router)"] -->|HTTPS, JSON| API["API NestJS (/api)"]
     API --> DB[("PostgreSQL")]
     API --> Cloud[("Cloudinary")]
+    API -->|"LlmProvider"| LLM["Gemini API"]
 ```
 
 ## Modelo de datos
@@ -104,6 +106,12 @@ solicitud, para que ambos cambios queden consistentes.
 redeploy), así que las imágenes de mascotas se suben directamente a Cloudinary y solo se guarda la
 URL y el `publicId` en la base de datos.
 
+**Proveedor de IA detrás de una interfaz:** la lógica de negocio (`PetDescriptionService`) depende de
+la interfaz `LlmProvider`, no de Gemini. Un `useFactory` en `AiModule` lee `LLM_PROVIDER` y entrega la
+implementación; cambiar de proveedor es escribir una clase nueva, agregar un `case` y cambiar una
+variable de entorno, sin tocar el servicio. Un valor desconocido en `LLM_PROVIDER`, o una
+`GEMINI_API_KEY` ausente, hace fallar el arranque en vez de fallar en la primera petición de un usuario.
+
 **Decisión conocida — el access token vive en `localStorage`:** el refresh token también. Es más
 simple de implementar que cookies `httpOnly`, pero significa que un XSS exitoso podría leer ambos
 tokens. La alternativa correcta — refresh token en cookie `httpOnly` + `secure` + `sameSite`, access
@@ -113,6 +121,33 @@ punta a punta no trivial. Queda pendiente (ver [Estado y siguientes pasos](#esta
 mientras tanto, el `ValidationPipe` estricto, el rate limiting y CORS restringido a orígenes
 específicos reducen la superficie de ataque de XSS que podría explotar esto.
 
+## Descripciones con IA
+
+`POST /api/ai/pet-description` recibe los datos del animal y devuelve `{ description }`, un párrafo
+de 60 a 100 palabras. Decisiones de diseño:
+
+- **El modelo solo usa lo que se le da.** El prompt de sistema prohíbe inventar historia clínica,
+  edad, vacunas o comportamiento. Los campos vacíos se filtran antes de armar el prompt, y
+  `vaccinated`/`sterilized` solo se envían cuando son `true`: en la base `false` es el valor por
+  defecto y puede significar "no se sabe", no "no está vacunado".
+- **Instrucciones separadas de los datos.** Las reglas van en `systemInstruction` y los datos del
+  animal, dentro de `<datos_del_animal>` en el mensaje de usuario, con la orden explícita de
+  tratarlos como información y no como instrucciones. Es una defensa en profundidad contra
+  inyección de prompt a través de campos de texto libre (como las notas), no una garantía absoluta.
+- **Acceso y costo acotados.** Solo `RESCATISTA` y `ADMIN`; límite propio de 10 peticiones/minuto
+  (cada llamada consume una cuota externa finita, a diferencia de un `SELECT`); y el DTO limita la
+  longitud de cada campo (por ejemplo, 500 caracteres en `notes`) para que una sola petición no
+  pueda agotar la cuota.
+- **Fallas del proveedor contenidas.** Timeout de 20 s con `AbortController`; el detalle del error
+  de Gemini se registra en el servidor y al cliente solo llega un 503 genérico, sin filtrar
+  información del proveedor.
+- **Nunca se devuelve texto truncado.** Los modelos Gemini 3 "piensan" antes de responder y esos
+  tokens cuentan contra `maxOutputTokens`, así que con un límite bajo la respuesta se cortaba a mitad
+  de frase. Se fija `thinkingLevel: "minimal"` y, además, si Gemini responde con
+  `finishReason: MAX_TOKENS` se devuelve un 503 en vez del texto incompleto.
+- **El humano siempre decide.** El texto generado cae en el mismo campo editable del formulario;
+  no se publica nada sin que el rescatista lo revise.
+
 ## Seguridad
 
 Medidas ya implementadas, además de las validaciones de autorización por objeto (IDOR) en cada
@@ -121,7 +156,8 @@ endpoint que opera sobre un recurso concreto (animales, imágenes, solicitudes):
 - `ValidationPipe` global con `whitelist`/`forbidNonWhitelisted`: el cliente no puede inyectar
   campos como `role` o `status` en el cuerpo de una petición para escalar privilegios.
 - Rate limiting (`@nestjs/throttler`): 5 intentos/minuto en login, registro y refresh; 10/minuto en
-  creación de solicitudes de adopción; 100/minuto en el resto de la API.
+  creación de solicitudes de adopción; 10/minuto en la generación de descripciones con IA; 100/minuto
+  en el resto de la API.
 - `helmet`, límite de tamaño de petición (1MB) y CORS restringido a los orígenes de `FRONTEND_URL`
   (admite varios separados por coma, para producción + previews).
 - Subida de imágenes: solo rescatistas autenticados, máximo 6 por animal, 5MB por archivo, y se
@@ -159,8 +195,13 @@ docker compose up -d
 cd backend
 cp .env.example .env
 # DATABASE_URL y DIRECT_URL ya apuntan a localhost:5432 (ver docker-compose.yml) si usas los
-# mismos valores del .env.example. Completa JWT_SECRET, JWT_REFRESH_SECRET, CLOUDINARY_* y
-# SEED_ADMIN_PASSWORD (usa una contraseña real, no el valor de ejemplo)
+# mismos valores del .env.example. Completa JWT_SECRET, JWT_REFRESH_SECRET, CLOUDINARY_*,
+# GEMINI_API_KEY (https://aistudio.google.com/apikey) y SEED_ADMIN_PASSWORD (usa una contraseña
+# real, no el valor de ejemplo)
+#
+# Si el puerto 5432 ya lo ocupa otro Postgres (por ejemplo uno instalado en Windows), crea en la
+# raíz del repo un archivo .env con POSTGRES_PORT=5433 y cambia el puerto en DATABASE_URL y
+# DIRECT_URL de backend/.env. Docker Compose lee POSTGRES_PORT de la raíz, no de backend/.env.
 npm install
 npm run db:migrate     # aplica las migraciones de Prisma
 npm run db:seed        # carga los datos de demostración
@@ -191,10 +232,11 @@ automático:
 Pasos manuales que quedan pendientes en el panel de Render después de crear el Blueprint:
 
 1. En `pawconnect-api`, completar `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY` y `CLOUDINARY_API_SECRET` con las credenciales de una cuenta de Cloudinary.
-2. En `pawconnect-api`, completar `FRONTEND_URL` con la URL pública que Render asigna a `pawconnect-frontend` (necesaria para CORS).
-3. En `pawconnect-frontend`, completar `NEXT_PUBLIC_API_URL` con la URL pública de `pawconnect-api` seguida de `/api` (ej. `https://pawconnect-api.onrender.com/api`).
-4. Correr el seed una vez que la API esté desplegada: desde la Shell de Render del servicio `pawconnect-api`, definir `SEED_ADMIN_EMAIL`/`SEED_ADMIN_PASSWORD` como variables de entorno y ejecutar `npm run db:seed`.
-5. Redesplegar `pawconnect-api` y `pawconnect-frontend` después de completar las variables de los pasos 1-3 (Render no reinicia automáticamente al editar variables de servicios ya desplegados en el mismo blueprint apply).
+2. En `pawconnect-api`, completar `GEMINI_API_KEY` con una clave de [Google AI Studio](https://aistudio.google.com/apikey) (`LLM_PROVIDER` y `GEMINI_MODEL` ya vienen con valor en el Blueprint). Sin esta variable la API no arranca.
+3. En `pawconnect-api`, completar `FRONTEND_URL` con la URL pública que Render asigna a `pawconnect-frontend` (necesaria para CORS).
+4. En `pawconnect-frontend`, completar `NEXT_PUBLIC_API_URL` con la URL pública de `pawconnect-api` seguida de `/api` (ej. `https://pawconnect-api.onrender.com/api`).
+5. Correr el seed una vez que la API esté desplegada: desde la Shell de Render del servicio `pawconnect-api`, definir `SEED_ADMIN_EMAIL`/`SEED_ADMIN_PASSWORD` como variables de entorno y ejecutar `npm run db:seed`.
+6. Redesplegar `pawconnect-api` y `pawconnect-frontend` después de completar las variables de los pasos 1-4 (Render no reinicia automáticamente al editar variables de servicios ya desplegados en el mismo blueprint apply).
 
 ## Estructura del proyecto
 
@@ -209,6 +251,7 @@ pawconnect-adoption-platform/
 │   │   ├── adoption-requests/     solicitudes de adopción y su ciclo de estados
 │   │   ├── admin/                 aprobación de rescatistas, suspensión de usuarios
 │   │   ├── stats/                 estadísticas públicas para la landing
+│   │   ├── ai/                    descripciones con IA (interfaz LlmProvider + proveedor Gemini)
 │   │   ├── upload/                integración con Cloudinary
 │   │   ├── prisma/                cliente de base de datos (PrismaService)
 │   │   └── common/                guards y decoradores compartidos (roles, JWT)
@@ -240,4 +283,5 @@ logout, protección de rutas en servidor (`proxy.ts`), y stats públicas reales 
 - Mover el access/refresh token de `localStorage` a cookie `httpOnly` (ver [Decisiones técnicas](#decisiones-técnicas))
 - Reemplazar el texto de referencia de `/privacidad` por una política de tratamiento de datos real
 - Notificaciones por correo (ej. cuando una solicitud es aprobada o rechazada)
-- Tests automatizados de los flujos principales
+- Tests automatizados de los flujos principales (incluida la autorización de `/ai/pet-description`: 401 sin token, 403 para adoptantes, 400 con cuerpo inválido)
+- Reintento con backoff exponencial ante los 503 de Gemini, y botón de generar descripción también al editar un animal
