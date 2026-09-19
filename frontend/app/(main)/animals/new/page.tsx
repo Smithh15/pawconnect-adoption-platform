@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Loader2, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -55,6 +55,7 @@ export default function NewAnimalPage() {
     control,
     watch,
     setValue,
+    getValues,
     formState: { errors, isSubmitting },
   } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -63,6 +64,62 @@ export default function NewAnimalPage() {
 
   const vaccinated = watch('vaccinated');
   const sterilized = watch('sterilized');
+
+  const [generating, setGenerating] = useState(false);
+  const [previousDescription, setPreviousDescription] = useState<string | null>(null);
+
+  async function generateDescription() {
+    const values = getValues();
+
+    if (!values.name?.trim() || !values.species) {
+      toast.error('Completa al menos el nombre y la especie para generar la descripción');
+      return;
+    }
+
+    const rawAge = values.ageMonths;
+    const ageMonths = rawAge === '' || rawAge === undefined || rawAge === null ? undefined : Number(rawAge);
+    if (ageMonths !== undefined && (!Number.isInteger(ageMonths) || ageMonths < 0 || ageMonths > 600)) {
+      toast.error('La edad debe ser un número entero de meses entre 0 y 600');
+      return;
+    }
+
+    const currentText = values.description?.trim() ?? '';
+
+    setGenerating(true);
+    try {
+      const res = await api.post<{ description: string }>('/ai/pet-description', {
+        name: values.name.trim(),
+        species: values.species,
+        breed: values.breed?.trim() || undefined,
+        ageMonths,
+        size: values.size || undefined,
+        gender: values.gender || undefined,
+        vaccinated: values.vaccinated,
+        sterilized: values.sterilized,
+        healthNotes: values.healthNotes?.trim().slice(0, 500) || undefined,
+        notes: currentText ? currentText.slice(0, 500) : undefined,
+      });
+      setPreviousDescription(values.description ?? '');
+      setValue('description', res.data.description, { shouldValidate: true, shouldDirty: true });
+      toast.success('Descripción generada. Revísala y edítala antes de publicar');
+    } catch (err: unknown) {
+      const response = (err as { response?: { status?: number; data?: { message?: string | string[] } } })?.response;
+      if (response?.status === 429) {
+        toast.error('Demasiadas solicitudes. Espera un minuto e inténtalo de nuevo');
+      } else {
+        const message = response?.data?.message;
+        toast.error((Array.isArray(message) ? message.join(', ') : message) ?? 'No se pudo generar la descripción');
+      }
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  function undoGeneratedDescription() {
+    if (previousDescription === null) return;
+    setValue('description', previousDescription, { shouldValidate: true, shouldDirty: true });
+    setPreviousDescription(null);
+  }
 
   async function onSubmit(data: FormData) {
     try {
@@ -205,13 +262,45 @@ export default function NewAnimalPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="description">Historia y personalidad</Label>
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor="description">Historia y personalidad</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={generateDescription}
+                  disabled={generating || isSubmitting}
+                >
+                  {generating ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Sparkles className="h-4 w-4" />
+                  )}
+                  {generating ? 'Generando...' : 'Generar con IA'}
+                </Button>
+              </div>
               <Textarea
                 id="description"
                 placeholder="Cuéntanos la historia del animal, su personalidad, comportamiento... (mínimo 20 caracteres)"
                 rows={5}
                 {...register('description')}
               />
+              <p className="text-xs text-muted-foreground">
+                La IA usa los datos del formulario y lo que escribas aquí como notas. Revisa y edita el
+                texto antes de publicar.
+                {previousDescription !== null && (
+                  <>
+                    {' '}
+                    <button
+                      type="button"
+                      onClick={undoGeneratedDescription}
+                      className="font-medium text-primary underline underline-offset-2"
+                    >
+                      Deshacer
+                    </button>
+                  </>
+                )}
+              </p>
               {errors.description && (
                 <p className="text-xs text-destructive">{errors.description.message}</p>
               )}
