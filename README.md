@@ -161,9 +161,30 @@ endpoint que opera sobre un recurso concreto (animales, imágenes, solicitudes):
 - Rate limiting (`@nestjs/throttler`): 5 intentos/minuto en login, registro y refresh, y en cambio de
   contraseña y eliminación de cuenta; 10/minuto en creación de solicitudes de adopción y en la
   generación de descripciones con IA; 20/minuto en subida de imágenes; 100/minuto en el resto de la API.
-  Detrás de un proxy (Render) hay que definir `TRUST_PROXY=1` (ya viene en `render.yaml`): sin eso
-  `req.ip` es la IP del proxy para todos y el cupo se comparte entre todos los usuarios. Se usa el
-  número de proxies y no `true`, porque `true` permitiría evadir el límite falseando `X-Forwarded-For`.
+  Detrás de un proxy hay que definir `TRUST_PROXY` con el número de proxies: sin eso `req.ip` es la
+  IP del proxy para todos y el cupo se comparte entre todos los usuarios. Se usa un número y no `true`,
+  porque `true` permitiría evadir el límite falseando `X-Forwarded-For`. `render.yaml` trae `1` como
+  **valor inicial sin confirmar**: Render pone Cloudflare y su balanceador delante y su documentación
+  no dice cuántas entradas añade a `X-Forwarded-For`. Se probó en local simulando el proxy con
+  cabeceras, no en Render.
+
+  **Verificar `TRUST_PROXY` en Render (tras el primer deploy).** Espera 60 s entre cada paso:
+
+  ```bash
+  API=https://TU-API.onrender.com/api/auth/login
+  BODY='{"email":"a@b.co","password":"x"}'
+
+  # 1) 6 intentos desde la misma red: se espera 401 401 401 401 401 429
+  for i in 1 2 3 4 5 6; do curl -s -o /dev/null -w "%{http_code} " -X POST $API -H "Content-Type: application/json" -d "$BODY"; done; echo
+
+  # 2) desde OTRA red (datos móviles), un solo intento: se espera 401. Si da 429, el cupo se
+  #    comparte entre clientes: faltan proxies (prueba TRUST_PROXY=2)
+  curl -s -o /dev/null -w "%{http_code}\n" -X POST $API -H "Content-Type: application/json" -d "$BODY"
+
+  # 3) como el paso 1 pero falseando la cabecera en cada intento: se espera que igual salga un 429.
+  #    Si nunca sale, sobran proxies (la app usa un valor que controla el cliente): baja el número
+  for i in 1 2 3 4 5 6; do curl -s -o /dev/null -w "%{http_code} " -X POST $API -H "Content-Type: application/json" -H "X-Forwarded-For: 1.1.1.$i" -d "$BODY"; done; echo
+  ```
 - Sesiones: el refresh token se guarda como SHA-256 del token completo (bcrypt solo procesa los
   primeros 72 bytes, que en un JWT son iguales para todos los tokens de un mismo usuario, así que un
   token viejo seguía pasando la comparación). Un login nuevo, cambiar la contraseña, suspender o

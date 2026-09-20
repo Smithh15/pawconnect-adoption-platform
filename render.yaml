@@ -18,7 +18,10 @@ services:
         value: 4000
       - key: NODE_ENV
         value: production
-      # Render pone un proxy delante de la API; sin esto el rate limit se comparte entre todos los usuarios
+      # Numero de proxies delante de la API. Sin esto el rate limit se comparte entre todos los usuarios.
+      # 1 es un valor inicial NO confirmado: Render pone Cloudflare y su balanceador delante y su
+      # documentacion no dice cuantas entradas anade a X-Forwarded-For. Verificalo tras el primer
+      # deploy con el procedimiento del README (seccion Seguridad, "Verificar TRUST_PROXY en Render").
       - key: TRUST_PROXY
         value: 1
       - key: DATABASE_URL
