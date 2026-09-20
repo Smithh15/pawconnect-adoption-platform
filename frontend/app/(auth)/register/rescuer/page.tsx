@@ -22,7 +22,10 @@ import { api } from '@/lib/api';
 const schema = z.object({
   name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres'),
   email: z.string().email('Correo inválido'),
-  password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres'),
+  password: z
+    .string()
+    .min(8, 'La contraseña debe tener al menos 8 caracteres')
+    .max(72, 'La contraseña no puede superar los 72 caracteres'),
   phone: z.string().optional(),
   city: z.string().min(2, 'La ciudad es requerida'),
   organizationName: z.string().optional(),

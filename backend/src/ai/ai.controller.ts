@@ -5,6 +5,7 @@ import { PetDescriptionService } from './pet-description.service';
 import { GeneratePetDescriptionDto } from './dto/generate-pet-description.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../common/guards/roles.guard';
+import { ApprovedRescuerGuard } from '../common/guards/approved-rescuer.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 
 @Controller('ai')
@@ -13,7 +14,7 @@ export class AiController {
 
   @Post('pet-description')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard, ApprovedRescuerGuard)
   @Roles(Role.RESCATISTA, Role.ADMIN)
   @Throttle({ default: { limit: 10, ttl: 60_000 } })
   async generatePetDescription(

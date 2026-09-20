@@ -5,8 +5,9 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { Role } from '@prisma/client';
+import { Role, UserStatus } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
+import { createHash, timingSafeEqual } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
 import { RegisterRescuerDto } from './dto/register-rescuer.dto';
@@ -116,15 +117,20 @@ export class AuthService {
 
       const user = await this.prisma.user.findUnique({
         where: { id: payload.sub },
-        select: { hashedRefreshToken: true },
+        select: { hashedRefreshToken: true, status: true },
       });
 
       if (!user?.hashedRefreshToken) {
         throw new UnauthorizedException('Sesión cerrada, inicia sesión nuevamente');
       }
 
-      const tokenMatches = await bcrypt.compare(refreshToken, user.hashedRefreshToken);
-      if (!tokenMatches) {
+      if (user.status !== UserStatus.ACTIVE) {
+        throw new UnauthorizedException('Usuario no autorizado');
+      }
+
+      const incoming = Buffer.from(this.hashToken(refreshToken));
+      const stored = Buffer.from(user.hashedRefreshToken);
+      if (incoming.length !== stored.length || !timingSafeEqual(incoming, stored)) {
         throw new UnauthorizedException('Refresh token inválido o expirado');
       }
 
@@ -168,12 +174,18 @@ export class AuthService {
       ),
     ]);
 
-    const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
     await this.prisma.user.update({
       where: { id: userId },
-      data: { hashedRefreshToken },
+      data: { hashedRefreshToken: this.hashToken(refreshToken) },
     });
 
     return { accessToken, refreshToken };
+  }
+
+  // SHA-256 del token completo. bcrypt solo procesa los primeros 72 bytes, y en un JWT esos bytes
+  // (cabecera + inicio del payload) son iguales para todos los tokens del mismo usuario, asi que un
+  // token viejo seguia pasando la comparacion despues de un login nuevo.
+  private hashToken(token: string): string {
+    return createHash('sha256').update(token).digest('hex');
   }
 }

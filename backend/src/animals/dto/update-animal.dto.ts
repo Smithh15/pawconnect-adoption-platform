@@ -4,6 +4,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  Max,
   MaxLength,
   Min,
   MinLength,
@@ -29,6 +30,7 @@ export class UpdateAnimalDto {
   @IsOptional()
   @IsInt()
   @Min(0)
+  @Max(600)
   ageMonths?: number;
 
   @IsOptional()

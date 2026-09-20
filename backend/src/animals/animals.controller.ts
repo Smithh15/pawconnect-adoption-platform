@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -14,6 +15,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { Throttle } from '@nestjs/throttler';
 import { Role } from '@prisma/client';
 import { memoryStorage } from 'multer';
 import { AnimalsService } from './animals.service';
@@ -75,13 +77,14 @@ export class AnimalsController {
   @Post(':id/images')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.RESCATISTA)
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
       limits: { fileSize: 5 * 1024 * 1024 },
       fileFilter: (_req, file, cb) => {
         if (!file.mimetype.match(/^image\/(jpeg|png|webp)$/)) {
-          cb(new Error('Solo se permiten imágenes JPG, PNG o WEBP'), false);
+          cb(new BadRequestException('Solo se permiten imágenes JPG, PNG o WEBP'), false);
           return;
         }
         cb(null, true);

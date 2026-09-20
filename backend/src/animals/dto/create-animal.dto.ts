@@ -4,6 +4,7 @@ import {
   IsInt,
   IsOptional,
   IsString,
+  Max,
   MaxLength,
   Min,
   MinLength,
@@ -27,6 +28,7 @@ export class CreateAnimalDto {
   @IsOptional()
   @IsInt()
   @Min(0)
+  @Max(600)
   ageMonths?: number;
 
   @IsEnum(AnimalSize)

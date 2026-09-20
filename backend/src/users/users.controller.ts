@@ -1,10 +1,13 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Patch, UseGuards } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { DeleteAccountDto } from './dto/delete-account.dto';
+
+const SENSITIVE_THROTTLE = { default: { limit: 5, ttl: 60_000 } };
 
 @Controller('users')
 @UseGuards(JwtAuthGuard)
@@ -22,6 +25,7 @@ export class UsersController {
   }
 
   @Patch('me/password')
+  @Throttle(SENSITIVE_THROTTLE)
   changePassword(
     @CurrentUser() user: { id: string },
     @Body() dto: ChangePasswordDto,
@@ -30,6 +34,7 @@ export class UsersController {
   }
 
   @Delete('me')
+  @Throttle(SENSITIVE_THROTTLE)
   @HttpCode(HttpStatus.OK)
   deleteMe(
     @CurrentUser() user: { id: string },

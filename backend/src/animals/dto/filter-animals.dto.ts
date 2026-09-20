@@ -1,4 +1,4 @@
-import { IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsEnum, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 import { Species, AnimalSize, Gender, AnimalStatus } from '@prisma/client';
 
@@ -21,10 +21,12 @@ export class FilterAnimalsDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(100)
   city?: string;
 
   @IsOptional()
   @IsString()
+  @MaxLength(64)
   rescuerId?: string;
 
   @IsOptional()

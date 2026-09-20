@@ -144,7 +144,7 @@ export class AdminService {
     const [updated] = await this.prisma.$transaction([
       this.prisma.user.update({
         where: { id: userId },
-        data: { status: UserStatus.SUSPENDED },
+        data: { status: UserStatus.SUSPENDED, hashedRefreshToken: null },
         select: { id: true, name: true, email: true, status: true },
       }),
       this.prisma.moderationLog.create({
