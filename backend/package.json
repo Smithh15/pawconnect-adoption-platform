@@ -42,7 +42,7 @@
     "@types/cookie-parser": "^1.4.10",
     "@types/express": "^5.0.0",
     "@types/multer": "^2.1.0",
-    "@types/node": "^24.0.0",
+    "@types/node": "^26.1.2",
     "@types/passport-jwt": "^4.0.1",
     "@types/passport-local": "^1.0.38",
     "bcrypt": "^6.0.0",
