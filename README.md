@@ -134,10 +134,13 @@ de 60 a 100 palabras. Decisiones de diseño:
   animal, dentro de `<datos_del_animal>` en el mensaje de usuario, con la orden explícita de
   tratarlos como información y no como instrucciones. Es una defensa en profundidad contra
   inyección de prompt a través de campos de texto libre (como las notas), no una garantía absoluta.
-- **Acceso y costo acotados.** Solo `RESCATISTA` y `ADMIN`; límite propio de 10 peticiones/minuto
-  (cada llamada consume una cuota externa finita, a diferencia de un `SELECT`); y el DTO limita la
-  longitud de cada campo (por ejemplo, 500 caracteres en `notes`) para que una sola petición no
-  pueda agotar la cuota.
+- **Acceso y costo acotados.** Solo rescatistas con perfil `APPROVED` y `ADMIN`
+  (`ApprovedRescuerGuard`): registrarse como fundación asigna el rol al instante, así que comprobar
+  solo el rol dejaba a cualquiera con una cuenta nueva gastar la cuota de Gemini; límite propio de 10
+  peticiones/minuto (cada llamada consume una cuota externa finita, a diferencia de un `SELECT`); y el
+  DTO limita la longitud de cada campo (por ejemplo, 500 caracteres en `notes`) para que una sola
+  petición no pueda agotar la cuota. La clave de Gemini solo la lee el backend, viaja en el header
+  `x-goog-api-key` (no en la URL) y nunca entra al prompt.
 - **Fallas del proveedor contenidas.** Timeout de 20 s con `AbortController`; el detalle del error
   de Gemini se registra en el servidor y al cliente solo llega un 503 genérico, sin filtrar
   información del proveedor.
@@ -155,9 +158,22 @@ endpoint que opera sobre un recurso concreto (animales, imágenes, solicitudes):
 
 - `ValidationPipe` global con `whitelist`/`forbidNonWhitelisted`: el cliente no puede inyectar
   campos como `role` o `status` en el cuerpo de una petición para escalar privilegios.
-- Rate limiting (`@nestjs/throttler`): 5 intentos/minuto en login, registro y refresh; 10/minuto en
-  creación de solicitudes de adopción; 10/minuto en la generación de descripciones con IA; 100/minuto
-  en el resto de la API.
+- Rate limiting (`@nestjs/throttler`): 5 intentos/minuto en login, registro y refresh, y en cambio de
+  contraseña y eliminación de cuenta; 10/minuto en creación de solicitudes de adopción y en la
+  generación de descripciones con IA; 20/minuto en subida de imágenes; 100/minuto en el resto de la API.
+  Detrás de un proxy (Render) hay que definir `TRUST_PROXY=1` (ya viene en `render.yaml`): sin eso
+  `req.ip` es la IP del proxy para todos y el cupo se comparte entre todos los usuarios. Se usa el
+  número de proxies y no `true`, porque `true` permitiría evadir el límite falseando `X-Forwarded-For`.
+- Sesiones: el refresh token se guarda como SHA-256 del token completo (bcrypt solo procesa los
+  primeros 72 bytes, que en un JWT son iguales para todos los tokens de un mismo usuario, así que un
+  token viejo seguía pasando la comparación). Un login nuevo, cambiar la contraseña, suspender o
+  eliminar la cuenta invalidan el refresh token anterior; refrescar exige que el usuario siga activo.
+- Credenciales: contraseñas de 8 a 72 caracteres (72 es el límite real de bcrypt) y correos
+  normalizados a minúsculas, para que `A@x.com` y `a@x.com` no sean cuentas distintas.
+- Dependencias: `npm audit` del frontend sin vulnerabilidades. En el backend quedan 3 avisos altos de
+  `multer` / `@nestjs/platform-express` cuya corrección exige Nest 12 (ver Pendiente); esas rutas
+  requieren autenticación, límite de tamaño y de peticiones.
+- Postgres de `docker-compose.yml` publicado solo en `127.0.0.1`, no en toda la red local.
 - `helmet`, límite de tamaño de petición (1MB) y CORS restringido a los orígenes de `FRONTEND_URL`
   (admite varios separados por coma, para producción + previews).
 - Subida de imágenes: solo rescatistas autenticados, máximo 6 por animal, 5MB por archivo, y se
@@ -285,3 +301,5 @@ logout, protección de rutas en servidor (`proxy.ts`), y stats públicas reales 
 - Notificaciones por correo (ej. cuando una solicitud es aprobada o rechazada)
 - Tests automatizados de los flujos principales (incluida la autorización de `/ai/pet-description`: 401 sin token, 403 para adoptantes, 400 con cuerpo inválido)
 - Reintento con backoff exponencial ante los 503 de Gemini, y botón de generar descripción también al editar un animal
+- Actualizar a Nest 12 para cerrar los avisos de `multer`; cabeceras de seguridad (CSP, `X-Frame-Options`) en el frontend; quitar de `next.config.ts` los hosts de imágenes de demo (`placedog.net`, `cataas.com`) cuando ya no se use el seed con fotos externas
+- Límite de la IA por usuario y no solo por IP (el `ThrottlerGuard` global corre antes de saber quién es el usuario)
